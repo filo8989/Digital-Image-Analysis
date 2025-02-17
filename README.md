@@ -1,11 +1,13 @@
 # Integrating Spatial Vessel Analysis into Tumour Microenvironment Characterization
 
 ## Overview
-Understanding the tumour microenvironment is crucial for targeted therapies. While various cellular components are extensively studied, spatial vessel analysis is often overlooked. This project presents a pipeline for vessel segmentation and analysis, applied to evaluate whether eribulin (ERI) treatment improves docetaxel (DTX) distribution in leiomyosarcoma (LMS) through vascular remodeling.
+The **erivessel** repository focuses on integrating **spatial vessel analysis** into tumour microenvironment characterization. Specifically, it presents a pipeline for vessel segmentation and analysis, applied to evaluate **vascular remodeling induced by Eribulin treatment** in **leiomyosarcoma (LMS)** and its impact on **docetaxel (DTX) distribution**.
 
-## Research Questions
-- Does Eribulin treatment alter vessel characteristics?
-- How does vessel distribution impact drug penetration and distribution?
+This repository contains tools for:
+- **Extracting vessel features** from histological images.
+- **Analyzing vessel morphology**.
+- **Performing spatial analysis** on vessel distribution.
+- **Integrating Imaging Mass Spectrometry (IMS)** data for drug penetration analysis.
 
 ## Methods
 1. **Sample Preparation**: LMS patient-derived xenograft (PDX) model slices stained for CD31 (endothelial marker) to visualize vessels.
