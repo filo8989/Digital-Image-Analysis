@@ -200,7 +200,7 @@ for folder in folders:
    - `eccentricity`: Measures how close to a circle the vessel is (0 = perfect circle, 1 = line).
    - `orientation`: The angle in degrees of the major axis relative to the horizontal axis.
 
-  
+  The `label()` function from `skimage.measure` assigns a unique integer label to each connected component - in our case a segmented vessel - in the binary image, this helps in identifying individual vessels. You then define the list of desired morphological properties and compute them.
   ```python
   label_img = label(opening)
   all_props = ["area", "axis_major_length", "axis_minor_length", "eccentricity", "orientation"]
@@ -209,17 +209,17 @@ for folder in folders:
   data = pd.DataFrame(props)
   data.to_csv(f'{directory_to_save}Measurements_{folder}.csv', index=True)
   ```
-The output is a CSV file `{folder}_Measurements.csv` containing quantitative measurements of each detected vessel in the segmented image. The columns of the CSV file represent different morphological properties of the vessels, and each row corresponds to one labeled vessel.
+   The output is a CSV file `{folder}_Measurements.csv` containing quantitative measurements of each detected vessel in the segmented image. The columns of the CSV file represent different morphological properties of the vessels, and each row corresponds to one labeled vessel.
 
-## Conclusions
-This pipeline integrates spatial vessel analysis into tumour microenvironment characterization, demonstrating the impact of vascular remodeling on drug penetration. The approach is generalizable and provides a foundation for investigating tumour vascularization, drug distribution, and treatment response.
+### 4. **Interpret Your Data**
+Finally, you have arrived at the last step. This is where the numbers should start to talk, where images should transform into knowledge, and where you should ask yourself, **“So what?”**, what do these findings mean for your future research? And just like that, you’ve made sense of it all, you've taken a raw histological image and extracted meaningful biological insights. So, go forth and analyze, because in the world of vessel analysis, the smallest capillary could hold the biggest discovery.
 
 ## Contributors 
-Dr. S. L. Renne, Dr. Ö. Mintemur, G. Grion, K. Roufail, F. E. Colella.
+G. Grion, K. Roufail, F. E. Colella, Dr. Ö. Mintemur, Dr. S. L. Renne.
 
 ## Citation
 If you use this pipeline, please cite:
 > Renne et al., Integrating Spatial Vessel Analysis into Tumour Microenvironment Characterization, *Virchows Arch*, 485(Suppl 1), 2024.
 
 ## Contact
-For inquiries, please reach out via [GitHub Issues](https://github.com/slrenne/erivessel/issues).
+For inquiries, please reach out via [GitHub Issues](https://github.com/filo8989/Digital-Image-Analysis/issues).
