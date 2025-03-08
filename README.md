@@ -146,14 +146,12 @@ for folder in folders:
   ??????
   
 - #### 3.4 Morphological operations
-  You fine-tune the segmentation by cleaning up noise and ensuring vessel structures are continuous thanks to morphological operations. 
-
-  Feel free to play with the parameters below to tailor the output to your necessities, according to the characteristics of your histological images and the level of detail required for your analysis.
-   - `kernel_for_structuring_element_for_segmentation` defines the size of the structuring element used during segmentation. Increasing its size can help connect  small gaps in fragmented vessels, but may also lead to over-segmentation. Reducing it preserves finer details but might leave gaps in vessel structures.
-   - `kernel_for_structuring_element_for_closing` determines the size of the kernel used for morphological closing (dilation followed by erosion), which helps fill small holes within vessels. A larger kernel merges nearby structures more aggressively, while a smaller one maintains finer vessel details.
-   - `iterations_for_dilate` controls how many times the dilation operation is applied. More iterations expand the segmented vessel regions, potentially merging adjacent vessels, while fewer iterations maintain a more conservative segmentation.
-   - `iterations_for_closing` specifies the number of times closing is performed. Higher values result in more pronounced gap-filling and smoother vessel structures, whereas lower values retain more original segmentation details.
-     
+  You fine-tune the segmentation by cleaning up noise and ensuring vessel structures are continuous thanks to morphological operations. Feel free to play with the parameters below to tailor the output to your necessities, according to the characteristics of your histological images and the level of detail required for your analysis.
+   - If vessels appear fragmented → Increase dilation iterations or use a larger segmentation kernel.
+   - If vessels merge too much → Decrease dilation iterations or use a smaller segmentation kernel.
+   - If there are small gaps in vessels → Increase closing iterations or kernel size.
+   - If fine details are lost → Use a smaller closing kernel or fewer iterations.
+   
    ```python
    kernel_for_structuring_element_for_segmentation = (15, 15)
    kernel_for_structuring_element_for_closing = (15, 15)
