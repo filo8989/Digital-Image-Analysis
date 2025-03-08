@@ -158,8 +158,7 @@ for folder in folders:
    iterations_for_dilate = 4
    iterations_for_closing = 3
     ```
-
-Additionally, you may find the boundaries of the detected vessels to fill them in the binary image.
+   Dilation is used to bridge small gaps between fragmented vessel structures, improving connectivity. Closing, which involves dilation followed by erosion, eliminates small holes within vessels. Additionally, you may find the boundaries of the detected vessels to fill them in the binary image.
    ```python
    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, kernel_for_structuring_element_for_segmentation)
    binary = cv2.dilate(binary, kernel, iterations=iterations_for_dilate)
