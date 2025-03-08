@@ -148,7 +148,11 @@ for folder in folders:
 - #### 3.4 Morphological operations
   You fine-tune the segmentation by cleaning up noise and ensuring vessel structures are continuous thanks to morphological operations. 
 
-  Feel free to play with the parameters below to tailor the output to your necessities.
+  Feel free to play with the parameters below to tailor the output to your necessities, according to the characteristics of your histological images and the level of detail required for your analysis.
+  `kernel_for_structuring_element_for_segmentation` defines the size of the structuring element used during segmentation. Increasing its size results in a broader effect, which can help connect fragmented vessels but may also lead to over-segmentation. Reducing it preserves finer details but might leave gaps in vessel structures.
+`kernel_for_structuring_element_for_closing` determines the size of the kernel used for morphological closing (dilation followed by erosion), which helps fill small gaps in vessel segmentation. A larger kernel merges nearby structures more aggressively, while a smaller one maintains finer vessel details.
+`iterations_for_dilate` controls how many times the dilation operation is applied. More iterations expand the segmented vessel regions, potentially merging adjacent vessels, while fewer iterations maintain a more conservative segmentation.
+`iterations_for_closing` specifies the number of times closing is performed. Higher values result in more pronounced gap-filling and smoother vessel structures, whereas lower values retain more original segmentation details.
    ```python
    kernel_for_structuring_element_for_segmentation = (15, 15)
    kernel_for_structuring_element_for_closing = (15, 15)
@@ -197,7 +201,7 @@ for folder in folders:
    - `area`: The number of pixels inside each segmented vessel.
    - `axis_major_length`: The length of the longest axis of the vessel (major axis of the fitted ellipse).
    - `axis_minor_length`: The length of the shortest axis of the vessel (minor axis of the fitted ellipse).
-   - `eccentricity`: Measures how close to a circle the vessel is (0 = perfect circle, 1 = line).
+   - `eccentricity`: Measures how close to a circle the vessel is (0 = perfect circle, between 0 and 1 = ellipse, 1 = parabola).
    - `orientation`: The angle in degrees of the major axis relative to the horizontal axis.
 
   The `label()` function from `skimage.measure` assigns a unique integer label to each connected component - in our case a segmented vessel - in the binary image, this helps in identifying individual vessels. You then define the list of desired morphological properties and compute them.
