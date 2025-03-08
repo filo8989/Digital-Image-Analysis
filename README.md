@@ -149,10 +149,11 @@ for folder in folders:
   You fine-tune the segmentation by cleaning up noise and ensuring vessel structures are continuous thanks to morphological operations. 
 
   Feel free to play with the parameters below to tailor the output to your necessities, according to the characteristics of your histological images and the level of detail required for your analysis.
-  `kernel_for_structuring_element_for_segmentation` defines the size of the structuring element used during segmentation. Increasing its size results in a broader effect, which can help connect fragmented vessels but may also lead to over-segmentation. Reducing it preserves finer details but might leave gaps in vessel structures.
-`kernel_for_structuring_element_for_closing` determines the size of the kernel used for morphological closing (dilation followed by erosion), which helps fill small gaps in vessel segmentation. A larger kernel merges nearby structures more aggressively, while a smaller one maintains finer vessel details.
-`iterations_for_dilate` controls how many times the dilation operation is applied. More iterations expand the segmented vessel regions, potentially merging adjacent vessels, while fewer iterations maintain a more conservative segmentation.
-`iterations_for_closing` specifies the number of times closing is performed. Higher values result in more pronounced gap-filling and smoother vessel structures, whereas lower values retain more original segmentation details.
+   - `kernel_for_structuring_element_for_segmentation` defines the size of the structuring element used during segmentation. Increasing its size can help connect  small gaps in fragmented vessels, but may also lead to over-segmentation. Reducing it preserves finer details but might leave gaps in vessel structures.
+   - `kernel_for_structuring_element_for_closing` determines the size of the kernel used for morphological closing (dilation followed by erosion), which helps fill small holes within vessels. A larger kernel merges nearby structures more aggressively, while a smaller one maintains finer vessel details.
+   - `iterations_for_dilate` controls how many times the dilation operation is applied. More iterations expand the segmented vessel regions, potentially merging adjacent vessels, while fewer iterations maintain a more conservative segmentation.
+   - `iterations_for_closing` specifies the number of times closing is performed. Higher values result in more pronounced gap-filling and smoother vessel structures, whereas lower values retain more original segmentation details.
+     
    ```python
    kernel_for_structuring_element_for_segmentation = (15, 15)
    kernel_for_structuring_element_for_closing = (15, 15)
@@ -160,7 +161,7 @@ for folder in folders:
    iterations_for_closing = 3
     ```
 
-   Dilation is used to bridge small gaps between fragmented vessel structures, improving connectivity. Closing, which involves dilation followed by erosion, eliminates small holes within vessels. Additionally, you may find the boundaries of the detected vessels to fill them in the binary image.
+Additionally, you may find the boundaries of the detected vessels to fill them in the binary image.
    ```python
    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, kernel_for_structuring_element_for_segmentation)
    binary = cv2.dilate(binary, kernel, iterations=iterations_for_dilate)
