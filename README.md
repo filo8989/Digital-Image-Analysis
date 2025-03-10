@@ -22,7 +22,8 @@ The following pipeline offers a robust, reproducible, and scalable solution for 
    - 3.3 Tile stitching
    - 3.4 Morphological operations
    - 3.5 Feature extraction
-4. **Interpret Your Data**
+4. **Gaussian Process Modelling**
+5. **Interpret Your Data**
 
 ---
 
@@ -47,7 +48,7 @@ Before diving into analysis, we need to prepare your images. Here’s what you n
    Now, break down your images into digestible tiles. Imagine you're a cartographer mapping out a new land. You wouldn’t study the entire continent at once, right? You’d divide it into sections. That’s exactly why tiling is a crucial preprocessing step for users with images that are too large to process efficiently all at once, so they are divided into smaller, more manageable tiles. This is how vessels are captured with adequate detail while maintaining computational efficiency. 
     - Navigate to: "Analyze → Tiles & Superpixels → Create Tiles" to generate sub-images, or tiles.
     - Set tile size based on the expected vessel dimensions, ensuring adequate resolution for segmentation.
-    - Execute the "ExportingImages.groovy" script as follows:
+    - Execute the `ExportingImages.groovy` script as follows:
 
       Firstly, preliminary setup requires importation of the necessary QuPath libraries for image writing and region requests, enabling you to manipulate images and regions within QuPath.
       ```groovy
@@ -90,7 +91,7 @@ Before diving into analysis, we need to prepare your images. Here’s what you n
    - After running the entire script, check the tile output for completeness and quality to ensure that all relevant details are preserved before proceeding to segmentation. Are you all set? Let’s proceed to the next section.
 
 ### 3. **Segment Vessels and Extract Features in Python**
-This is where the true transformation — or as some may say, magic— happens. With the image tiles ready, you can perform vessel segmentation and feature extraction using Python. Simply run the "Segmentation.py" script as follows.
+This is where the true transformation — or as some may say, magic— happens. With the image tiles ready, you can perform vessel segmentation and feature extraction using Python. Simply run the `Segmentation.py` script as follows.
 
 In the prelinimary setup, upload necessary libraries.
 ```python
@@ -143,7 +144,7 @@ for folder in folders:
   
 - #### 3.3 Tile stitching
   For now, you're left with individual segmented tiles. However, like solving a puzzle where you’ve analyzed each piece individually, it’s time to put them back together to see the bigger picture.
-  ??????
+  ???????????????????????
   
 - #### 3.4 Morphological operations
   You fine-tune the segmentation by cleaning up noise and ensuring vessel structures are continuous thanks to morphological operations. Feel free to play with the parameters below to tailor the output to your necessities, according to the characteristics of your histological images and the level of detail required for your analysis.
@@ -213,7 +214,102 @@ for folder in folders:
   ```
    The output is a CSV file `{folder}_Measurements.csv` containing quantitative measurements of each detected vessel in the segmented image. The columns of the CSV file represent different morphological properties of the vessels, and each row corresponds to one labeled vessel.
 
-### 4. **Interpret Your Data**
+### 4. **Gaussian Process Modelling**
+Gaussian Process (GP) modelling is used to infer vessel spatial structures and relationships from histological images. This statistical approach provides a probabilistic framework for learning spatial dependencies, making it particularly useful in characterizing vessel distributions and their biological relevance.
+
+- #### 4.1 Simulating vessel mask matrices
+  To begin, execute the `Final_optimized_4_Windows.R` you may find in this repository.
+
+  To start, set up your environment. Notably, set a fixed seed for random number generation, import the rethinking package (detailed intructions for installation may be found on R. McElreath's GitHub repository).
+  ```python
+  set.seed(20241028)
+  library(parallel)
+  library(rethinking)
+  library(plot.matrix)
+  library(viridis)
+  library(MASS)
+  library(parallel)
+   
+  num_cores <- detectCores() - 1
+  cl <- makeCluster(num_cores)
+  ```
+  
+   Here, vessel masks are generated for a set of images by simulating random circular vessel structures within a defined grid.
+   ```python
+   simulate_vessel_mask <- function(n, circles) {
+     mat <- matrix(0, nrow = n, ncol = n)
+     for (i in 1:n) {
+       for (j in 1:n) {
+         for (circle in circles) {
+           center <- circle$center
+           radius <- circle$radius
+           if (sqrt((i - center[1])^2 + (j - center[2])^2) <= radius) {
+             mat[i, j] <- 1
+           }
+         }
+       }
+     }
+     return(mat)
+   }
+   ```
+   - #### 4.2 Generating distance matrices and GP covariance
+   Using the vessel mask matrices, distance matrices are computed, followed by the generation of covariance matrices using an exponential kernel function.
+
+  ```python
+  rho <- sqrt(0.5)
+   eta_sq <- 2
+   
+   compute_distance_matrix <- function(grid) {
+     return(as.matrix(dist(grid, method = "euclidean")))
+   }
+   
+   compute_covariance_matrix <- function(Dmat, eta_sq, rho) {
+     return(eta_sq * exp(-0.5 * (Dmat / rho)^2) + diag(1e-9, length(Dmat)))
+   }
+  ```
+   - #### 4.3 GP Prior Simulation
+   A GP prior is sampled using the generated covariance matrices, providing an initial statistical representation of vessel distributions.
+   ```python
+   sim_gp <- parLapply(cl, 1:N_img, function(i) {
+     MASS::mvrnorm(1, mu = rep(0, n*n), Sigma = Ks[[i]])
+   })
+   ```
+   - ### 4.4 Bayesian model fitting
+   The GP model is formulated and fitted using the `ulam` function from the rethinking package. This approach allows for Bayesian inference on vessel spatial organization.
+
+   ```python
+   model_code <- "alist(\n"
+   for (i in 1:N_img) {
+     model_code <- paste0(model_code,
+                          "  y", i, " ~ multi_normal(mu", i, ", K", i, "),\n",
+                          "  mu", i, " <- a + b * x", i, ",\n",
+                          "  matrix[N, N]:K", i, " <- etasq * exp(-0.5 * square(Dmat", i, " / rho)) + diag_matrix(rep_vector(0.01, N)),\n")
+   }
+   model_code <- paste0(model_code,
+                        "  a ~ normal(0, 1),\n",
+                        "  b ~ normal(0, 0.5),\n",
+                        "  etasq ~ exponential(2),\n",
+                        "  rho ~ exponential(0.5)\n",
+                        ")")
+   
+   GP_N <- ulam(eval(parse(text = model_code)), data = dat_list, chains = 4, cores = num_cores, iter = 600, warmup = 150)
+   ```
+
+  - ### 4.5 Visualization of results
+   The model’s output is visualized by plotting the estimated covariance functions against prior assumptions, aiding in the interpretation of vessel spatial organisation.
+
+  ```python
+  plot(NULL, xlim = c(0, max(Dmats[[1]])/3), ylim = c(0, 10),
+     xlab = "pixel distance", ylab = "covariance",
+     main = "Prior, Actual, and Estimated Kernel")
+
+   for (i in 1:20) {
+     curve(post$etasq[i] * exp(-0.5 * (x/post$rho[i])^2),
+           add = TRUE, col = col.alpha(4, 0.3), lwd = 6)
+   }
+   ```
+
+### 5. **Interpret Your Data**
 Finally, you have arrived at the last step. This is where the numbers should start to talk, where images should transform into knowledge, and where you should ask yourself, **“So what?”**, what do these findings mean for your future research? And just like that, you’ve made sense of it all, you've taken a raw histological image and extracted meaningful biological insights. So, go forth and analyze, because in the world of vessel analysis, the smallest capillary could hold the biggest discovery.
 
 ## Contributors 
