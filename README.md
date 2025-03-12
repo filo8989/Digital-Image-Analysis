@@ -1,7 +1,7 @@
-# Vessel Analysis 
+# Spatial Vessel Analysis 
 
 ## Overview
-The following pipeline offers a robust, reproducible, and scalable solution for extracting vessel-related features from histological images. Accurate vascular network segmentation provides key insights into vascular conformation and remodeling. While particularly relevant in oncology for characterizing the tumor microenvironment, it may also be applied to other diseases where vascular alterations are of paramount importance, including those involving inflammation, fibrosis, and microvascular dysfunction. By enhancing our understanding of vascular-mediated disease progression and treatment response, this approach supports both research and clinical decision-making.
+The following pipeline offers a robust, reproducible, and scalable solution for extracting vessel-related features from histological images. Accurate vascular network segmentation provides key insights into vascular conformation and remodeling. Additionally, this pipeline also correlates vascular structures with drug distribution. While particularly relevant in oncology for characterizing the tumor microenvironment, it may also be applied to other diseases where vascular alterations are of paramount importance, including those involving inflammation, fibrosis, and microvascular dysfunction. By enhancing our understanding of vascular-mediated disease progression and treatment delivery, this approach supports both research and clinical decision-making.
 
 ## Objectives
 - **Quantitative Analysis**: Extracts precise vessel morphology and spatial distribution metrics.
@@ -27,7 +27,6 @@ The following pipeline offers a robust, reproducible, and scalable solution for 
    - 4.2 Definition of a known drug distribution function
    - 4.3 Application of GP modelling on simulator
    - 4.4 Assesment of model accuracy
-   - 4.5 Real life GP application
 5. **Interpret Your Data**
 
 ---
@@ -270,9 +269,16 @@ Let's now explore a path illuminated by our newfound understanding of vascular n
         )
       }
       ```
+      
+      We generate vessel masks in parallel using the defined `test_function()`.
+      ```r
+      clusterExport(cl, c("test_function", "n", "circles_list"))
 
+      mats <- parLapply(cl, 1:N_img, function(i) test_function(n, circles_list[[i]]))
+      ```
+      
    - #### 4.2 Creating Simulated MALDI Images
-      Next, we generate simulated MALDI intensity maps based on a predefined function, such as an exponential decay model:
+      Next, we generate simulated MALDI intensity maps based on any predefined function you like, such as an exponential decay model:
       
       ```math
       I(x) = \eta^2 e^{- \frac{d(x)^2}{2\rho^2}}
@@ -281,57 +287,115 @@ Let's now explore a path illuminated by our newfound understanding of vascular n
       - $d(x)$, the Euclidean distance from vessels,  
       - $\eta^2$, the signal variance,  
       - $\rho$, the characteristic length scale controlling spatial correlation.
-      
-      We compute the Euclidean distance matrices and covariance matrices in parallel:
+
+      First, compute Euclidean distance matrices for each image in parallel.
       ```r
-      Dmats <- lapply(1:N_img, function(i) {
-        expand.grid(X = 1:n, Y = 1:n) %>%
-        dist(method = "euclidean") %>%
-        as.matrix()
-      })
-      
+      grids <- parLapply(cl, 1:N_img, function(i) expand.grid(X = 1:n, Y = 1:n))
+      Dmats <- parLapply(cl, 1:N_img, function(i) as.matrix(dist(grids[[i]], method = "euclidean")))
+      ```
+      Then, as previously mentioned, define the the kernel function parameters.
+      ```r
       beta <- 5
       etasq <- 2
       rho <- sqrt(0.5)
-      
-      Ks <- lapply(1:N_img, function(i) {
+      ```
+      Compute covariance matrices using the radial basis function (RBF) kernel.
+      ```r
+      clusterExport(cl, c("beta", "etasq", "rho", "Dmats"))
+      Ks <- parLapply(cl, 1:N_img, function(i) {
         etasq * exp(-0.5 * ((Dmats[[i]] / rho)^2)) + diag(1e-9, n*n)
       })
       ```
-      
-      We sample synthetic MALDI intensities from this model:
+      Now, sample synthetic MALDI intensities using a GP prior.
       ```r
-      # Generate GP prior samples
-      sim_gp <- lapply(1:N_img, function(i) {
+      clusterExport(cl, "Ks")
+      
+      sim_gp <- parLapply(cl, 1:N_img, function(i) {
         MASS::mvrnorm(1, mu = rep(0, n*n), Sigma = Ks[[i]])
       })
       ```
-
+      Generate observed intensity values by adding noise.
+      ```r
+      clusterExport(cl, c("sim_gp"))
+      sim_y <- parLapply(cl, 1:N_img, function(i) {
+        rnorm(n*n, mean = sim_gp[[i]] + beta * as.vector(t(mats[[i]])), sd = 1)
+      })
+      ```
    - #### 4.3 Inferring drug distribution with GP regression
       Now that we have simulated data, we fit a Gaussian Process model using **Bayesian inference** with **Stan (rethinking package)**.
-      
+
+      First, prepare data for the Bayesian model.
       ```r
-      # Fit the model
+      dat_list <- list(N = n*n)
+      for(i in 1:N_img) {
+        dat_list[[ paste0("y", i) ]] <- sim_y[[i]]
+        dat_list[[ paste0("x", i) ]] <- as.vector(t(mats[[i]]))
+        dat_list[[ paste0("Dmat", i) ]] <- Dmats[[i]]
+      }
+      ```
+      Next, define the GP model.
+      ```r
+      model_code <- "alist(\n"
+      for(i in 1:N_img) {
+        model_code <- paste0(model_code,
+                             "  y", i, " ~ multi_normal(mu", i, ", K", i, "),\n",
+                             "  mu", i, " <- a + b * x", i, ",\n",
+                             "  matrix[N, N]:K", i, " <- etasq * exp(-0.5 * square(Dmat", i, " / rho)) + diag_matrix(rep_vector(0.01, N)),\n")
+      }
+      model_code <- paste0(model_code,
+                           "  a ~ normal(0, 1),\n",
+                           "  b ~ normal(0, 0.5),\n",
+                           "  etasq ~ exponential(2),\n",
+                           "  rho ~ exponential(0.5)\n",
+                           ")")
+      
+      model_list <- eval(parse(text = model_code))
+      ```
+      
+      Fit the GP model using Hamiltonian Monte Carlo (HMC) via the `ulam` function from the rethinking package. This approach enables Bayesian inference on vessel spatial organization and drug distribution. Feel free to play around with the following parameters according to your computational resources. 
+      - `chains` sets how many independent MCMC chains are run to ensure proper convergence.
+      - `cores` sets how many CPU cores are used to parallelize computation and speed up sampling.
+      - `iter` sets how manu iterations are run per chain, including warm-up.
+      - `warmup` sets how many iterations are used for warm-up (not included in posterior estimates).
+        
+      ```r
       GP_N <- ulam(model_list, data = dat_list, chains = 4, cores = num_cores, iter = 600, warmup = 150)
+      ```
+      Finnally, print the model summary.
+      ```r
       print(precis(GP_N))
+      
+      post <- extract.samples(GP_N)
       ```
    
    - #### 4.4 **Validating the Model**
-      We visualize the inferred vs. true covariance functions:
-      
+      We visualize the inferred vs. true covariance functions by plotting the priors, the actual kernel and the estimated kernels (your posterior samples). Also, remember to stop the cluster to free resources.
       ```r
-      # Plot kernel comparison
+      set.seed(08062002)
+      
+      p.etasq <- rexp(n, rate = 0.5)
+      p.rhosq <- rexp(n, rate = 0.5)
+      
       plot(NULL, xlim = c(0, max(Dmats[[1]])/3), ylim = c(0, 10),
            xlab = "pixel distance", ylab = "covariance",
            main = "Prior, Actual, and Estimated Kernel")
-      ```
       
-      If the inferred decay function closely matches the predefined exponential function, the GP model is validated and ready for real MALDI images.
-
-   - #### 4.5 **Summary**
-      - **Gaussian Process Modelling** estimates drug distribution based on MALDI intensity data.
-      - **Validation via synthetic images** ensures the model accurately recovers known distribution parameters.
-      - **Future application** involves applying the model to real histology-MALDI datasets to investigate drug distribution in tissues.
+      # Priors
+      for(i in 1:20)
+        curve(p.etasq[i] * exp(-0.5 * (x/p.rhosq[i])^2),
+              add = TRUE, lwd = 6, col = col.alpha(2, 0.5))
+      
+      # Actual kernel
+      curve(etasq * exp(-0.5 * (x/rho)^2), add = TRUE, lwd = 4)
+      
+      # Estimated kernels
+      for(i in 1:20) {
+        curve(post$etasq[i] * exp(-0.5 * (x/post$rho[i])^2),
+              add = TRUE, col = col.alpha(4, 0.3), lwd = 6)
+      }
+      stopCluster(cl)
+      ```
+      If the inferred decay function closely matches the predefined function, it means the GP model accurately recovers known distribution parameters. So, the model's acccuracy is validated and ready to be easily applied to real world histological and MALDI images!
       
 ### 5. **Interpret Your Data**
 Finally, you have arrived at the last step. This is where the numbers should start to talk, where images should transform into knowledge, and where you should ask yourself, **“So what?”**, what do these findings mean for your future research? And just like that, you’ve made sense of it all, you've taken a raw histological image and extracted meaningful biological insights. So, go forth and analyze, because in the world of vessel analysis, the smallest capillary could hold the biggest discovery.
