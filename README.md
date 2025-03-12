@@ -225,7 +225,7 @@ Let's now explore a path illuminated by our newfound understanding of vascular n
    - #### 4.1 Generating synthetic vessel images**
       To begin, execute the `Final_optimized_4_Windows.R` you may find in this repository.
 
-      As usual, set up your environment. Notably, set a fixed seed for random number generation and import the `Statistical Rethinking` package (detailed intructions for installation may be found on R. McElreath's GitHub repository). We also create a parallel cluster to speed things up.
+      As usual, set up your environment. Notably, set a fixed seed for random number generation and import the `Statistical Rethinking` package (detailed intructions for installation may be found on [Richard McElreath's rethinking repository](https://github.com/rmcelreath/rethinking)). We also create a parallel cluster to speed things up.
       ```r
       set.seed(20241028)
       library(rethinking)
